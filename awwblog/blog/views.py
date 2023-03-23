@@ -1,6 +1,7 @@
-from django.shortcuts import render,get_object_or_404
+from django.shortcuts import render,get_object_or_404,redirect
 from django.core.paginator import Paginator,EmptyPage,PageNotAnInteger
-from .models import Post
+from .models import Post,Comments
+from .forms import Commentsform
 # Create your views here.
 def post_list(request):
     posts=Post.published.all()
@@ -15,5 +16,31 @@ def post_list(request):
     return render(request,'post_list.html',{'posts':posts})
 def post_detail(request,post):
     post=get_object_or_404(Post,slug=post,status='published')
-    return render(request,'post_detail.html',{'post':post})
+    comments = post.comments.filter(active=True)
+    comment_form = Commentsform(data=request.POST)
+    new_comment =None
+    if request.method=='Post':
+        comment_form=Commentsform(data=request.POST)
+        if comment_form.is_valid():
+            new_comment = comment_form.save(commit=False)
+            new_comment.post=post
+            new_comment.save()
+            return redirect(post.get_absolute_url()+'#'+str(new_comment.id))
+        else:
+            comment_form=Commentsform()
+    return render(request,'post_detail.html',{'post':post,'comments':comments,'comment_form':comment_form})
+def reply_page(request):
+    if request.method=="POST":
+        form =Commentsform(request.POST)
+        if form.is_valid():
+            post_id=request.POST.get('post_id')
+            parent_id=request.POST.get('parent')
+            post_url=request.POST.get('post_url')
+            reply=form.save(commit=False)
+            reply.post=Post(id=post_id)
+            reply.parent = Post(id=parent_id)
+            reply.save()
+            return redirect(post_url+'#'+str(reply.id))
+        return redirect("/")
+
 
